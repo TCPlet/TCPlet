@@ -1,22 +1,21 @@
 import java.net.*;
 
 public class TCPSender {
-    public static void main(String[] args) {
+    public void senderLoop(int WND_SIZE, int SENDER_PORT) {
         try (DatagramSocket socket = new DatagramSocket()) {
-            // 构造发送的数据包
             String message = "Hello, Receiver!";
             byte[] sendData = message.getBytes();
-            InetAddress receiverAddress = InetAddress.getByName("192.168.1.2"); // 接收端的 IP 地址
-            int receiverPort = 9876; // 接收端的端口号
+            ReceiverInfo info = Handshake.accept(SENDER_PORT);
+            InetAddress receiverAddress = InetAddress.getByName(info.IP_ADDR);
 
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receiverAddress, receiverPort);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receiverAddress, info.PORT);
 
-            // 发送数据包
             socket.send(sendPacket);
 
             System.out.println("Sent message to Receiver: " + message);
         } catch (Exception e) {
             e.printStackTrace();
         }
+
     }
 }
