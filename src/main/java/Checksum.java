@@ -3,7 +3,7 @@ public class Checksum {
         return null;
     }
 
-    public static boolean validate(byte[] input) {
+    public static boolean verifyChecksum(byte[] input) {
         return true;
     }
 }

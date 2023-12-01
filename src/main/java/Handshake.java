@@ -1,10 +1,12 @@
-public class Handshake {
-    public static ReceiverInfo accept(int SELF_PORT) {
+import java.net.InetAddress;
 
+public class Handshake {
+    // handshake for sender: return client Info
+    public static Info accept(FilteredSocket senderSocket) {
         return null;
     }
 
-    public static void connect(int SENDER_IP_ADDR, int SENDER_PORT, int SELF_PORT) {
-
+    // handshake for receiver
+    public static void connect(FilteredSocket receiverSocket, InetAddress SENDER_IP_ADDR, int SENDER_PORT) {
     }
 }

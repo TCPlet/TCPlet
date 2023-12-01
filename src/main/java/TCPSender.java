@@ -1,21 +1,16 @@
-import java.net.*;
 
 public class TCPSender {
-    public void senderLoop(int WND_SIZE, int SENDER_PORT) {
-        try (DatagramSocket socket = new DatagramSocket()) {
-            String message = "Hello, Receiver!";
-            byte[] sendData = message.getBytes();
-            ReceiverInfo info = Handshake.accept(SENDER_PORT);
-            InetAddress receiverAddress = InetAddress.getByName(info.IP_ADDR);
+    // Maximum Segment Size = 1460B
+    public static int MSS = 1460;
+    public static FilteredSocket socket;
 
-            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, receiverAddress, info.PORT);
-
-            socket.send(sendPacket);
-
-            System.out.println("Sent message to Receiver: " + message);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+    /**
+     * @param args
+     * java TCPSender -w WND_SIZE -p SENDER_PORT -d DATA
+     */
+    public static void main(String[] args) {
+        int WND_SIZE = Integer.parseInt(args[2]);
+        int SENDER_PORT = Integer.parseInt(args[4]);
+        socket = new FilteredSocket(SENDER_PORT);
     }
 }

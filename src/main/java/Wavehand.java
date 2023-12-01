@@ -1,9 +1,13 @@
+import java.net.InetAddress;
+
 public class Wavehand {
-    public static void senderFin(int SELF_PORT) {
+    // Sender send ACK and FIN
+    public static void senderClose(FilteredSocket senderSocket, int CLIENT_IP_ADDR, int CLIENT_PORT) {
 
     }
 
-    public static void receiverFin(int SENDER_IP_ADDR, int SENDER_PORT, int SELF_PORT) {
+    // Receiver send FIN and ACK
+    public static void receiverClose(FilteredSocket socket, InetAddress SENDER_IP_ADDR, int SENDER_PORT) {
 
     }
 }
