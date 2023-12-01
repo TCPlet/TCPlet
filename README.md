@@ -36,7 +36,7 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 3. Client sends ACK: (Data part is optional, not needed in TCPlet)
 > Control Flags: ACK = 1
 
-[//]: # (![Handshake]&#40;https://media.geeksforgeeks.org/wp-content/uploads/TCP-connection-1.png&#41;)
+![Handshake](https://media.geeksforgeeks.org/wp-content/uploads/TCP-connection-1.png)
 
 ### 4. Wavehand
 
@@ -52,14 +52,9 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 4. Client sends ACK:
 > Control Flags: ACK = 1
  
-[//]: # (![Handshake]&#40;http://images.timd.cn/blog/2018/tcp-four-way-wavehand.gif&#41;)
+![Handshake](http://images.timd.cn/blog/2018/tcp-four-way-wavehand.gif)
 
-### 5. Sequence Number and Acknowledgment Number
-
-1. Sequence Number = the byte stream number of the first byte in data
-2. Acknowledgment Number = sequence number of expecting segment from sender
-
-### 6. Tasks
+### 5. Tasks
 
 1. Real-time Simulation Utilities and Error Detection: (FilterSocket.java, Checksum.java) 张康
    > 1. Simulate timeout, lossy, corrupted, out-of-order segments
@@ -68,9 +63,33 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
         > 1. 3-way handshake
     * Wavehand (Wavehand.java) 陈彦昀
         > 1. 4-way wavehand
-3. Reliable Data Transfer(ARQ):
+3. Reliable Data Transfer:
     * Sender (TCPSender.java) 宁锐
         > 1. GBN + SACK
         > 2. Flow Control
     * Receiver (TCPReceiver.java) 周煜
         > 1. GBN + SACK
+        > 2. Flow Control
+
+### 6. TCPlet Protocol Implementation Details
+
+1. Connection Management
+   1. 3-way handshake: if ack timeout during transmission, wait and retransmit.(Verify sequence number in case of duplicate segment)
+   2. 4-way wavehand: if ack timeout during transmission, wait and retransmit.(Verify sequence number in case of duplicate segment)
+2. Reliable Data Transfer
+   1. Sequence Number and Acknowledgment Number
+      1. Sequence Number = the byte stream number of the first byte in data
+      2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Accumulative Number)***
+      3. Selective Acknowledgement Number = sequence number of the segment received this time.
+   2. Automatic Repeat reQuest
+      1. 3 duplicate acknowledgement number
+      2. timeout (RTO = EstimatedRTT + 4 * DevRTT)
+3. Flow Control
+   1. Receive window = receiveBufferSize - (lastByteAcked - lastByteProcessed)
+   2. Sender guarantees (lastByteSent - lastByteAcked) <= receive window
+4. Simulation:
+   1. Out-of-order implementation need buffering in socket.
+   2. Corrupt part of data shouldn't be too large.(eg. 0.1%)
+   3. To simulate data loss, just do nothing
+5. Checksum:
+   1. Same with TCP, add each 2 bytes together.
