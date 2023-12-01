@@ -2,7 +2,7 @@ import java.net.InetAddress;
 
 public class Handshake {
     // handshake for sender: return client Info
-    public static Info accept(FilteredSocket senderSocket) {
+    public static ReceiverInfo accept(FilteredSocket senderSocket) {
         //TODO
         return null;
     }

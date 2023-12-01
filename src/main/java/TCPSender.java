@@ -1,4 +1,3 @@
-import java.net.DatagramPacket;
 import java.util.TreeMap;
 
 public class TCPSender {
@@ -8,8 +7,9 @@ public class TCPSender {
     // Default Send Window Size = 2048B
     public static int SND_WND = 2048;
     public static FilteredSocket socket;
-    public static Info receiver;
+    public static ReceiverInfo receiver;
     private static int seqNum;
+    private static int rcvWnd;
 
     /**
      * @param args
@@ -21,6 +21,7 @@ public class TCPSender {
         socket = new FilteredSocket(SENDER_PORT);
         receiver = Handshake.accept(socket);
         seqNum = receiver.seq;
+        rcvWnd = receiver.rcvWnd;
         rdt(data);
         Wavehand.senderClose(socket, seqNum, receiver.IP, receiver.port);
     }
@@ -38,7 +39,12 @@ public class TCPSender {
             prevSeq += end - start;
         }
         // Transmission
-        while (!byteStream.isEmpty()) {
+        TreeMap<Integer, byte[]> window = new TreeMap<>();
+        int size = byteStream.size();
+        for (int i = 0; i < Math.min(SND_WND, size); i++) {
+            window.put(byteStream.firstKey(), byteStream.pollFirstEntry().getValue());
+        }
+        while (!byteStream.isEmpty() && !window.isEmpty()) {
             Segment segment = FilteredSocket.datagramPacket2Segment(socket.receive());
             while (segment == null) {
                 segment = FilteredSocket.datagramPacket2Segment(socket.receive());
