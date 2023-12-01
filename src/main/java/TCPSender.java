@@ -6,15 +6,23 @@ public class TCPSender {
     // Default Send Window Size = 2048B
     public static int SND_WND = 2048;
     public static FilteredSocket socket;
+    public static Info receiver;
+    private static int seqNum;
 
     /**
      * @param args
      * java TCPSender -p SENDER_PORT -d DATA
      */
     public static void main(String[] args) {
-        int WND_SIZE = Integer.parseInt(args[2]);
-        int SENDER_PORT = Integer.parseInt(args[4]);
+        int SENDER_PORT = Integer.parseInt(args[2]);
+        byte[] data = args[4].getBytes();
         socket = new FilteredSocket(SENDER_PORT);
-        //TODO
+        receiver = Handshake.accept(socket);
+        rdt(data);
+        Wavehand.senderClose(socket, seqNum, receiver.IP, receiver.port);
+    }
+
+    private static void rdt(byte[] data) {
+
     }
 }
