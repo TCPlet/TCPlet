@@ -65,10 +65,10 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
         > 1. 4-way wavehand
 3. Reliable Data Transfer:
     * Sender (TCPSender.java) 宁锐
-        > 1. GBN + SACK
+        > 1. Hybrid of GBN and SR
         > 2. Flow Control
     * Receiver (TCPReceiver.java) 周煜
-        > 1. GBN + SACK
+        > 1. Hybrid of GBN and SR
         > 2. Flow Control
 
 ### 6. TCPlet Protocol Implementation Details
@@ -79,7 +79,7 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 2. Reliable Data Transfer
    1. Sequence Number and Acknowledgment Number
       1. Sequence Number = the byte stream number of the first byte in data
-      2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Accumulative Number)***
+      2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Accumulative Acknowledgement Number)***
       3. Selective Acknowledgement Number = sequence number of the segment received this time.
    2. Automatic Repeat reQuest
       1. 3 duplicate acknowledgement number
