@@ -16,6 +16,11 @@ public class FilteredSocket {
         }
     }
 
+    public static Segment datagramPacket2Segment(DatagramPacket datagramPacket) {
+        byte[] data = datagramPacket.getData();
+        return Segment.toSegment(data);
+    }
+
     public DatagramPacket receive() {
         byte[] receiveData = new byte[TCPSender.MSS];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
