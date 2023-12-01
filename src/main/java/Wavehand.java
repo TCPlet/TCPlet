@@ -2,7 +2,7 @@ import java.net.InetAddress;
 
 public class Wavehand {
     // Sender send ACK and FIN
-    public static void senderClose(FilteredSocket senderSocket, int CLIENT_IP_ADDR, int CLIENT_PORT) {
+    public static void senderClose(FilteredSocket senderSocket, InetAddress CLIENT_IP_ADDR, int CLIENT_PORT) {
         //TODO
     }
 
