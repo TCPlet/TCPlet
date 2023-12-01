@@ -56,6 +56,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 
 ### 5. Tasks
 
+#### Important: Use FilteredSocket instead of DatagramSocket
+
 1. Real-time Simulation Utilities and Error Detection: (FilterSocket.java, Checksum.java) 张康
    > 1. Simulate timeout, lossy, corrupted, out-of-order segments
 2. Connection Management:
