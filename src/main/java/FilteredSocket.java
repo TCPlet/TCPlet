@@ -10,7 +10,7 @@ public class FilteredSocket {
 
     public FilteredSocket(int port) {
         try {
-            socket = new DatagramSocket();
+            socket = new DatagramSocket(port);
         } catch (SocketException e) {
             throw new RuntimeException(e);
         }

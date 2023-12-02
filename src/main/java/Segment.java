@@ -15,7 +15,7 @@ public class Segment {
     public byte[] data;
 
     public byte[] toByteStream() {
-        ByteBuffer buffer = ByteBuffer.allocate(20 + TCPSender.MSS); // 20 bytes for the given fields
+        ByteBuffer buffer = ByteBuffer.allocate(20 + data.length); // 20 bytes for the given fields
         buffer.putInt(seqNum);
         buffer.putInt(ackNum);
         buffer.putInt(sackNum);
@@ -27,11 +27,11 @@ public class Segment {
         byte[] checksum = Checksum.genChecksum(buffer.array());
         assert (checksum != null && checksum.length == 16);
 
-        buffer = ByteBuffer.allocate(20 + TCPSender.MSS); // 20 bytes for the given fields
+        buffer = ByteBuffer.allocate(20 + data.length); // 20 bytes for the given fields
         buffer.putInt(seqNum);
         buffer.putInt(ackNum);
-        buffer.putInt(rcvWnd);
         buffer.putInt(sackNum);
+        buffer.putInt(rcvWnd);
         buffer.putShort(flagsAndPadding);
         buffer.put(checksum);
         buffer.put(data);
@@ -65,8 +65,7 @@ public class Segment {
         }
 
         // Extract the data
-        segment.data = new byte[TCPSender.MSS];
-        buffer.get(segment.data);
+        segment.data = buffer.array();
 
         return segment;
     }
