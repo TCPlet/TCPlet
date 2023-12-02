@@ -22,7 +22,7 @@ public class FilteredSocket {
     }
 
     public DatagramPacket receive() {
-        byte[] receiveData = new byte[TCPSender.MSS];
+        byte[] receiveData = new byte[20 + TCPSender.MSS];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         try {
             socket.receive(receivePacket);
