@@ -155,7 +155,7 @@ public class TCPSender {
 
     private static void updateRTO(long SampleRTT) {
         long newEstimatedRTT = (long) (0.875 * EstimatedRTT + 0.125 * SampleRTT);
-        DevRTT = (long) (0.75 * DevRTT + Math.abs(EstimatedRTT - newEstimatedRTT));
+        DevRTT = (long) (0.75 * DevRTT + 0.25 * Math.abs(EstimatedRTT - newEstimatedRTT));
         EstimatedRTT = newEstimatedRTT;
     }
 
