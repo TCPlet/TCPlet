@@ -138,13 +138,14 @@ public class TCPSender {
                 RCV_WND.set(rcvWnd);
                 assert (notACKed.containsKey(ack) && notACKed.containsKey(sack));
                 notACKed.remove(sack);
-                Map.Entry<Integer, NotACKedSegment> entry = notACKed.pollFirstEntry();
+                Map.Entry<Integer, NotACKedSegment> entry;
                 long curTimeStamp = System.currentTimeMillis();
-                updateRTO(curTimeStamp - entry.getValue().timestamp);
-                while (entry.getKey() < ack) {
+                do {
                     entry = notACKed.pollFirstEntry();
-                    updateRTO(curTimeStamp - entry.getValue().timestamp);
-                }
+                    if (!entry.getValue().retransmitted) {
+                        updateRTO(curTimeStamp - entry.getValue().timestamp);
+                    }
+                } while (entry.getKey() < ack);
                 notACKedCondition.signal();
                 notACKedLock.unlock();
             }
