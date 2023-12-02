@@ -163,5 +163,11 @@ public class TCPSender {
         Thread ackReceiver = new Thread(new ACKReceiver());
         mainSender.start();
         ackReceiver.start();
+        try {
+            mainSender.join();
+            ackReceiver.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
