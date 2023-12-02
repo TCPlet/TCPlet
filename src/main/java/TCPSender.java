@@ -1,8 +1,7 @@
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -11,14 +10,17 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TCPSender {
     private static class NotACKedSegment {
         Segment segment;
-        int delay = EstimatedRTT.get();
+        long timestamp = System.currentTimeMillis();
+        boolean retransmitted = false;
+        long delay = EstimatedRTT + 4 * DevRTT;
         int ackNum;
         Timer timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
-                socket.rawChannelSend(segment.toByteStream(), receiver.IP, receiver.port);
                 while (notACKed.containsKey(ackNum)) {
+                    retransmitted = true;
+                    send(segment);
                     timer.schedule(task, delay);
                     delay *= 2;
                 }
@@ -40,11 +42,13 @@ public class TCPSender {
     public static ReceiverInfo receiver;
     private static AtomicInteger RCV_WND;
     // <ackNum, Segment>
-    private static final ConcurrentNavigableMap<Integer, Segment> segmentStream = new ConcurrentSkipListMap<>();
-    private static final ConcurrentNavigableMap<Integer, NotACKedSegment> notACKed = new ConcurrentSkipListMap<>();
+    private static final TreeMap<Integer, Segment> segmentStream = new TreeMap<>();
+    private static final TreeMap<Integer, NotACKedSegment> notACKed = new TreeMap<>();
 
-    private static AtomicInteger EstimatedRTT = new AtomicInteger(1000);
-    private static AtomicInteger DevRTT = new AtomicInteger(0);
+    private static long EstimatedRTT = 1000;
+    private static long DevRTT = 0;
+    private static int prevACK = 0;
+    private static int duplicateACKCount = 0;
     private static final Lock notACKedLock = new ReentrantLock();
     private static final Condition notACKedCondition = notACKedLock.newCondition();
 
@@ -76,6 +80,10 @@ public class TCPSender {
         Wavehand.senderClose(socket, seqNum, receiver.IP, receiver.port);
     }
 
+    public static void send(Segment segment) {
+        socket.rawChannelSend(segment.toByteStream(), receiver.IP, receiver.port);
+    }
+
 
     static class MainSender implements Runnable {
         @Override
@@ -86,8 +94,8 @@ public class TCPSender {
                 // 2. ACK received: window moving forward
                 // 3. Timeout Retransmit
                 // 4. Fast Retransmit
-                notACKedLock.lock();
                 while (!segmentStream.isEmpty()) {
+                    notACKedLock.lock();
                     if (notACKed.size() * MSS >= Math.min(SND_WND, RCV_WND.get())) {
                         notACKedCondition.await();
                     }
@@ -95,9 +103,9 @@ public class TCPSender {
                     NotACKedSegment notACKedSegment = new NotACKedSegment(entry.getValue());
                     notACKedSegment.timer.schedule(notACKedSegment.task, notACKedSegment.delay);
                     notACKed.put(entry.getKey(), notACKedSegment);
-                    socket.rawChannelSend(entry.getValue().toByteStream(), receiver.IP, receiver.port);
+                    send(entry.getValue());
+                    notACKedLock.unlock();
                 }
-                notACKedLock.unlock();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -113,22 +121,41 @@ public class TCPSender {
                 while (segment == null) {
                     segment = FilteredSocket.datagramPacket2Segment(socket.receive());
                 }
-                notACKedLock.lock();
                 int ack = segment.ackNum;
+                if (prevACK == ack) {
+                    if (++duplicateACKCount >= 3) {
+                        NotACKedSegment notACKedSegment = notACKed.firstEntry().getValue();
+                        notACKedSegment.retransmitted = true;
+                        send(notACKedSegment.segment);
+                    }
+                } else {
+                    prevACK = ack;
+                    duplicateACKCount = 0;
+                }
                 int sack = segment.sackNum;
                 int rcvWnd = segment.rcvWnd;
+                notACKedLock.lock();
                 RCV_WND.set(rcvWnd);
                 assert (notACKed.containsKey(ack) && notACKed.containsKey(sack));
                 notACKed.remove(sack);
                 Map.Entry<Integer, NotACKedSegment> entry = notACKed.pollFirstEntry();
+                long curTimeStamp = System.currentTimeMillis();
+                updateRTO(curTimeStamp - entry.getValue().timestamp);
                 while (entry.getKey() < ack) {
                     entry = notACKed.pollFirstEntry();
+                    updateRTO(curTimeStamp - entry.getValue().timestamp);
                 }
                 notACKedCondition.signal();
                 notACKedLock.unlock();
             }
 
         }
+    }
+
+    private static void updateRTO(long SampleRTT) {
+        long newEstimatedRTT = (long) (0.875 * EstimatedRTT + 0.125 * SampleRTT);
+        DevRTT = (long) (0.75 * DevRTT + Math.abs(EstimatedRTT - newEstimatedRTT));
+        EstimatedRTT = newEstimatedRTT;
     }
 
     private static void rdt() {
