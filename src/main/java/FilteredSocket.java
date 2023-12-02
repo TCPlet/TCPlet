@@ -43,17 +43,17 @@ public class FilteredSocket {
     }
 
     // data loss
-    public void lossyChannelSend(byte[] data, InetAddress dest) {
+    public void lossyChannelSend(byte[] data, InetAddress dest, int destPort) {
         //TODO
     }
 
     // data corruption
-    public void noisyChannelSend(byte[] data, InetAddress dest) {
+    public void noisyChannelSend(byte[] data, InetAddress dest, int destPort) {
         //TODO
     }
 
     // data loss and corruption
-    public void noisyAndLossyChannelSend(byte[] data, InetAddress dest) {
+    public void noisyAndLossyChannelSend(byte[] data, InetAddress dest, int destPort) {
         //TODO
     }
 
