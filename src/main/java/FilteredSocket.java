@@ -57,7 +57,7 @@ public class FilteredSocket {
         checkBuffer();
     }
     public void checkBuffer(){
-        while (!buffer.isEmpty()){
+        if (!buffer.isEmpty()){
             BufferNode temp=buffer.poll();
             rawChannelSend(temp.data,temp.dest,temp.port);
         }
