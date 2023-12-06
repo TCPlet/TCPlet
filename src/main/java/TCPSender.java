@@ -37,7 +37,7 @@ public class TCPSender {
     public static int MSS = 1460;
 
     // Default Send Window Size = 2048B
-    public static int SND_WND = 2048;
+    public static final int SND_WND = 2048;
     public static FilteredSocket socket;
     public static ReceiverInfo receiver;
     private static AtomicInteger RCV_WND;
@@ -96,8 +96,14 @@ public class TCPSender {
                 // 4. Fast Retransmit
                 while (!segmentStream.isEmpty()) {
                     notACKedLock.lock();
-                    if (notACKed.size() * MSS >= Math.min(SND_WND, RCV_WND.get())) {
+                    if (notACKed.size() * MSS >= SND_WND) {
                         notACKedCondition.await();
+                    }
+                    while (notACKed.size() * MSS >= RCV_WND.get()) {
+                        Segment zeroProbing = new Segment();
+                        zeroProbing.data = new byte[0];
+                        zeroProbing.seqNum = prevACK - 1;
+                        send(zeroProbing);
                     }
                     Map.Entry<Integer, Segment> entry = segmentStream.pollFirstEntry();
                     NotACKedSegment notACKedSegment = new NotACKedSegment(entry.getValue());
