@@ -22,6 +22,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 ### 3. Handshake
 
 > ***Both client_isn and server_isn need randomizing.***
+> 
+> ***SYN segment occupies 1 Byte***
 
 1. Client sends SYN:
 > Sequence Number = randomized client_isn
@@ -39,6 +41,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 ![Handshake](https://media.geeksforgeeks.org/wp-content/uploads/TCP-connection-1.png)
 
 ### 4. Wavehand
+
+> ***FIN segment occupies 1 Byte***
 
 1. Client sends FIN:
 > Control Flags: ACK = 1, FIN = 1
@@ -67,11 +71,13 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
         > 1. 4-way wavehand
 3. Reliable Data Transfer:
     * Sender (TCPSender.java) 宁锐
-        > 1. Hybrid of GBN and SR
-        > 2. Flow Control
+        > 1. Go-Back-N ARQ: For ***ackNum*** field, the segments with seqNum < ackNum have been acked.
+        > 2. Selective Repeat ARQ: For ***sackNum***field, the segment with seqNum = sackNum has been acked.
+        > 3. Flow Control
     * Receiver (TCPReceiver.java) 周煜
-        > 1. Hybrid of GBN and SR
-        > 2. Flow Control
+        > 1. Go-Back-N ARQ: For ***ackNum*** field, the segments with seqNum < ackNum have been acked.
+        > 2. Selective Repeat ARQ: For ***sackNum*** field, the segment with seqNum = sackNum has been acked.
+        > 3. Flow Control
 
 ### 6. TCPlet Protocol Implementation Details
 
@@ -84,8 +90,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
       2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Accumulative Acknowledgement Number)***
       3. Selective Acknowledgement Number = sequence number of the segment received this time.
    2. Automatic Repeat reQuest
-      1. 3 duplicate acknowledgement number
-      2. timeout (RTO = EstimatedRTT + 4 * DevRTT)
+      1. Fast retransmit: 3 duplicate acknowledgement number
+      2. Timeout retransmit: (RTO = EstimatedRTT + 4 * DevRTT)
 3. Flow Control
    1. Receive window = receiveBufferSize - (lastByteAcked - lastByteProcessed)
    2. Sender guarantees (lastByteSent - lastByteAcked) <= receive window
