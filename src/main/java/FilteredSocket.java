@@ -9,7 +9,9 @@ import java.util.*;
 public class FilteredSocket {
 
     private final DatagramSocket socket;
-
+    Double outOrderChance=0.01;
+    Double contentChane=0.01;
+    Double lossChance=0.01;
     //PriorityQueue Compare
     Comparator<BufferNode> customComparator = new Comparator<BufferNode>() {
         @Override
@@ -65,26 +67,23 @@ public class FilteredSocket {
     // data loss
     public void lossyChannelSend(byte[] data, InetAddress dest, int destPort) {
         //TODO
-        if(smallChance())return;
+        if(smallChance(lossChance))return;
         rawChannelSend(data,dest,destPort);
     }
 
     // data corruption
     public void noisyChannelSend(byte[] data, InetAddress dest, int destPort) {
         //TODO
-        if(smallChance()){
-            if(halfChance()){
+            if(smallChance(contentChane)){
                 //corrupt content
                 changeContent(data);
             }
-            if(halfChance()){
+            if(smallChance(outOrderChance)){
                 //change order
                 BufferNode Node=new BufferNode(data,dest,destPort);
                 buffer.add(Node);
                 return;
             }
-
-        }
         rawChannelSend(data,dest,destPort);
     }
 
@@ -111,10 +110,10 @@ public class FilteredSocket {
         }
         return data;
     }
-    private boolean smallChance(){
+    private boolean smallChance(double small){
         Random random=new Random();
-        Double chance=random.nextDouble(100);
-        return (chance<0.01);
+        Double chance=random.nextDouble(1);
+        return (chance<small);
     }
     private boolean halfChance(){
         Random random=new Random();
