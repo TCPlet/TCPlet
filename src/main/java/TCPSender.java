@@ -20,7 +20,9 @@ public class TCPSender {
                     retransmitted = true;
                     send(segment);
                     timer.schedule(new TimeoutTask(), delay);
-                    delay *= 2;
+                    if (delay < 60000) {
+                        delay *= 2;
+                    }
                 }
 
             }
