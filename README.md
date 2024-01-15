@@ -30,7 +30,7 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 > 
 > Control Flags: SYN = 1
  
-2. Server sends ACK:
+2. Server sends SYN-ACK:
 > Sequence Number = randomized server_isn
 > 
 > Control Flags: ACK = 1, SYN = 1
@@ -66,18 +66,18 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
    > 1. Simulate timeout, lossy, corrupted, out-of-order segments
 2. Connection Management:
     * Handshake (Handshake.java) 翁天成
-        > 1. 3-way handshake
+        > 1. 3-way handshake (Same with TCP): SYN, SYN-ACK, ACK
     * Wavehand (Wavehand.java) 陈彦昀
-        > 1. 4-way wavehand
+        > 1. 4-way wavehand (Same with TCP): ACK-FIN, ACK, ACK-FIN, ACK
 3. Reliable Data Transfer:
     * Sender (TCPSender.java) 宁锐
         > 1. Go-Back-N ARQ: For ***ackNum*** field, the segments with seqNum < ackNum have been acked.
         > 2. Selective Repeat ARQ: For ***sackNum***field, the segment with seqNum = sackNum has been acked.
-        > 3. Flow Control
+        > 3. Flow Control: ***rcvWnd*** field represents the size of receiver's spare buffer.
     * Receiver (TCPReceiver.java) 周煜
         > 1. Go-Back-N ARQ: For ***ackNum*** field, the segments with seqNum < ackNum have been acked.
         > 2. Selective Repeat ARQ: For ***sackNum*** field, the segment with seqNum = sackNum has been acked.
-        > 3. Flow Control
+        > 3. Flow Control: ***rcvWnd*** field represents the size of receiver's spare buffer.
 
 ### 6. TCPlet Protocol Implementation Details
 
@@ -93,8 +93,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
       1. Fast retransmit: 3 duplicate acknowledgement number
       2. Timeout retransmit: (RTO = EstimatedRTT + 4 * DevRTT)
 3. Flow Control
-   1. Receive window = receiveBufferSize - (lastByteAcked - lastByteProcessed)
-   2. Sender guarantees (lastByteSent - lastByteAcked) <= receive window
+   1. Receive window = receiverBufferSize - (lastByteAcked - lastByteProcessed)
+   2. Sender guarantees inFlightSegments (lastByteSent - lastByteAcked) <= receive window
 4. Simulation:
    1. Out-of-order implementation need buffering in socket.
    2. Corrupt part of data shouldn't be too large.(eg. 0.1%)
