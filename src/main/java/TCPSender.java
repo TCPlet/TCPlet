@@ -88,7 +88,7 @@ public class TCPSender {
             prevSeq += end - start;
         }
         rdt();
-        Wavehand.senderClose(socket, seqNum, receiver.IP, receiver.port);
+        Wavehand.senderClose(socket, seqNum + len, receiver.IP, receiver.port);
     }
 
     public void send(Segment segment) {
