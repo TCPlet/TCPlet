@@ -5,15 +5,9 @@ import java.util.Random;
 public class Handshake {
     // handshake for sender: return client Info
     public static ReceiverInfo accept(FilteredSocket senderSocket) {
-        //TODO
-//        try {
-//            ReceiverInfo receiverInfo = new ReceiverInfo(InetAddress.getByName("127.0.0.1"), 400, 1, 2048);
-//            return receiverInfo;
-//        } catch (UnknownHostException e) {
-//            throw new RuntimeException(e);
-//        }
-        return null;
-    }
+        // Wait for the SYN packet from the sender
+        DatagramPacket synPacket = senderSocket.receive();
+        Segment synSegment = Segment.toSegment(synPacket.getData());
 
         // Validate the SYN packet
         if (synSegment != null && synSegment.syn) {
@@ -69,11 +63,11 @@ public class Handshake {
         // Validate the SYN-ACK packet
         if (synAckSegment != null && synAckSegment.syn && synAckSegment.ack && synAckSegment.ackNum == initialSeqNum + 1) {
             // Create an ACK packet
-           Segment ackPacket = new Segment();
-           ackPacket.ack = true;
-           ackPacket.ackNum = synAckSegment.seqNum + 1;
-           ackPacket.rcvWnd = TCPSender.SND_WND;
-           receiverSocket.rawChannelSend(ackPacket.toByteStream(), SENDER_IP_ADDR, SENDER_PORT);
+            Segment ackPacket = new Segment();
+            ackPacket.ack = true;
+            ackPacket.ackNum = synAckSegment.seqNum + 1;
+            ackPacket.rcvWnd = TCPSender.SND_WND;
+            receiverSocket.rawChannelSend(ackPacket.toByteStream(), SENDER_IP_ADDR, SENDER_PORT);
         } else {
 
             throw new RuntimeException("Handshake failed");
@@ -82,6 +76,3 @@ public class Handshake {
     }
 
 }
-
-
-
