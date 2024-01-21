@@ -87,7 +87,7 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 2. Reliable Data Transfer
    1. Sequence Number and Acknowledgment Number
       1. Sequence Number = the byte stream number of the first byte in data (We define that SYN, SYN-ACK, FIN segment without data has data length 1)
-      2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Accumulative Acknowledgement Number)***
+      2. Acknowledgment Number = sequence number of expecting segment from sender ***Important: (Cumulative Acknowledgment Number)***
       3. Selective Acknowledgement Number = sequence number of the segment received this time.
    2. Automatic Repeat reQuest
       1. Fast retransmit: 3 duplicate acknowledgement number
