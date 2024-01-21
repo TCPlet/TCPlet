@@ -42,6 +42,7 @@ public class Handshake {
         throw new RuntimeException("Handshake failed");
 
     }
+
     // handshake for receiver
     public static void connect(FilteredSocket receiverSocket, InetAddress SENDER_IP_ADDR, int SENDER_PORT) {
 
