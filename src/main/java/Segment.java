@@ -25,7 +25,7 @@ public class Segment {
         buffer.putShort((short) 0);
         buffer.put(data);
         byte[] checksum = Checksum.genChecksum(buffer.array());
-        assert (checksum != null && checksum.length == 16);
+        assert (checksum != null && checksum.length == 2);//checksum为16位，两字节
 
         buffer = ByteBuffer.allocate(20 + data.length); // 20 bytes for the given fields
         buffer.putInt(seqNum);
