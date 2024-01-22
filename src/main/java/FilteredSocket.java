@@ -6,9 +6,9 @@ import java.util.*;
 public class FilteredSocket {
 
     final DatagramSocket socket;
-    Double outOrderChance = 0.01;
-    Double contentChane = 0.01;
-    Double lossChance = 0.01;
+    Double outOrderChance = 0.1;
+    Double contentChane = 0.1;
+    Double lossChance = 0.1;
     //PriorityQueue Compare
     Comparator<BufferNode> customComparator = new Comparator<BufferNode>() {
         @Override

@@ -3,13 +3,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TCPReceiver {
 
     public ReentrantLock lock = new ReentrantLock();
+    public Condition full = lock.newCondition();
+    public Condition empty = lock.newCondition();
     public FilteredSocket socket;
     public int RCV_WINDOW = 64 * 1024;
     // <seqNum, Segment>
@@ -58,16 +59,22 @@ public class TCPReceiver {
             }
             while (!term) {
                 lock.lock();
-                while (!window.isEmpty()) {
+                while (!term) {
+                    if (window.isEmpty()) {
+                        try {
+                            empty.await();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
                     Map.Entry<Integer, Segment> e = window.pollFirstEntry();
+                    System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
                     if (e.getValue().seqNum == ackNum) {
-                        ackNum += e.getValue().ackNum + e.getValue().data.length;
+                        ackNum += e.getValue().data.length;
                         RCV_WINDOW += e.getValue().data.length;
-//                        System.out.println(Arrays.toString(e1.getValue().data));
                         try {
                             // 将字节数组写入文件
                             // TODO: Debug
-                            System.out.println(new String(e.getValue().data));
                             fos.write(e.getValue().data);
                             System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
                         } catch (IOException err) {
@@ -78,8 +85,20 @@ public class TCPReceiver {
                         window.put(e.getKey(), e.getValue());
                         break;
                     }
+                    full.signal();
                 }
                 lock.unlock();
+            }
+            for (Map.Entry<Integer, Segment> en : window.entrySet()) {
+                try {
+                    // 将字节数组写入文件
+                    // TODO: Debug
+                    fos.write(en.getValue().data);
+                    System.out.printf("Bytes %d ~ %d written to file successfully.\n", en.getValue().seqNum, en.getValue().seqNum + en.getValue().data.length);
+                } catch (IOException err) {
+                    throw new RuntimeException();
+                }
+
             }
             try {
                 fos.close();
@@ -95,6 +114,7 @@ public class TCPReceiver {
         while (true) {
             Segment received = FilteredSocket.datagramPacket2Segment(socket.receive());
             while (received == null) {
+                System.out.println("Corrupted packet received");
                 received = FilteredSocket.datagramPacket2Segment(socket.receive());
             }
             // TODO: DEBUG
@@ -106,11 +126,15 @@ public class TCPReceiver {
             }
             Segment ack = new Segment();
             lock.lock();
-            if (received.data.length != 0 && RCV_WINDOW >= received.data.length) {
+            if (received.data.length != 0 && RCV_WINDOW >= received.data.length && received.seqNum + received.data.length > ackNum) {
+                // 1. not zero probing segment
+                // 2. enough buffer space
+                // 3. not acked before
                 window.put(received.seqNum, received);
-                RCV_WINDOW -= received.data.length;
                 ack.ackNum = ackNum;
                 ack.sackNum = received.seqNum + received.data.length;
+                RCV_WINDOW -= received.data.length;
+                empty.signal();
             }
             lock.unlock();
             // TODO: DEBUG
@@ -118,11 +142,15 @@ public class TCPReceiver {
             ack.data = new byte[0];
             ack.rcvWnd = RCV_WINDOW;
 
-            System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
             System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
+            System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
 
-            socket.rawChannelSend(ack.toByteStream(), Sender_IP, Sender_port);
+            send(ack);
         }
+    }
+
+    private void send(Segment seg) {
+        socket.noisyAndLossyChannelSend(seg.toByteStream(), Sender_IP, Sender_port);
     }
 }
 

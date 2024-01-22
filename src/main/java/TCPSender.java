@@ -24,11 +24,16 @@ public class TCPSender {
                 if (inFlight.containsKey(ackNum)) {
                     retransmitted = true;
                     System.out.printf("Timeout send: ack %d, len %d\n", ackNum, segment.data.length);
+                    StringBuilder sb = new StringBuilder();
+                    for (int i : inFlight.keySet()) {
+                        sb.append(i + " ");
+                    }
+                    System.out.println("In flight: " + sb.toString());
                     send(segment);
                     timer.cancel();
                     timer = new Timer();
                     timer.schedule(new TimeoutTask(), delay);
-                    if (delay < 10000) {
+                    if (delay < 100) {
                         delay *= 2;
                     }
                 } else {
@@ -49,7 +54,7 @@ public class TCPSender {
     public static final int MSS = 1460;
 
     // Default Send Window Size = 2048B
-    public static final int SND_WND = 2048;
+    public static final int SND_WND = 16 * 1024;
     public FilteredSocket socket;
     public ReceiverInfo receiver;
     private AtomicInteger RCV_WND;
@@ -96,7 +101,7 @@ public class TCPSender {
         for (int start = 0; start < len; start += MSS) {
             int end = Math.min(start + MSS, len);
             byte[] arr = new byte[end - start];
-//            System.out.printf("seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
+            System.out.printf("seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
             System.arraycopy(data, start, arr, 0, end - start);
             Segment segment = new Segment();
             segment.seqNum = prevSeq;
@@ -110,7 +115,7 @@ public class TCPSender {
     }
 
     public void send(Segment segment) {
-        socket.rawChannelSend(segment.toByteStream(), receiver.IP, receiver.port);
+        socket.noisyAndLossyChannelSend(segment.toByteStream(), receiver.IP, receiver.port);
     }
 
 
@@ -138,6 +143,7 @@ public class TCPSender {
                         zeroProbingSegment.data = new byte[0];
                         zeroProbingSegment.seqNum = prevACK;
                         send(zeroProbingSegment);
+                        System.out.println("Zero window probing");
                         Thread.sleep(EstimatedRTT + 4 * DevRTT);
                     }
                     InFlightSegment inFlightSegment = new InFlightSegment(entry.getValue());
@@ -165,11 +171,13 @@ public class TCPSender {
                 int ack = segment.ackNum;
                 System.out.printf("ACK received: ack %d sack %d wnd %d\n", ack, segment.sackNum, segment.rcvWnd);
                 //TODO: DEBUG
+                inFlightLock.lock();
                 if (prevACK == ack) {
                     if (++duplicateACKCount >= 3) {
                         for (Map.Entry<Integer, InFlightSegment> e : inFlight.entrySet()) {
                             InFlightSegment inFlightSegment = e.getValue();
                             inFlightSegment.retransmitted = true;
+                            System.out.printf("FAST retransmit: seq %d, len %d\n", inFlightSegment.segment.seqNum, inFlightSegment.segment.data.length);
                             send(inFlightSegment.segment);
                             duplicateACKCount = 0;
                         }
@@ -179,7 +187,6 @@ public class TCPSender {
                     duplicateACKCount = 0;
                 }
                 int sack = segment.sackNum;
-                inFlightLock.lock();
                 RCV_WND.set(segment.rcvWnd);
                 // TODO: For debug
                 assert (inFlight.containsKey(ack) && inFlight.containsKey(sack));
