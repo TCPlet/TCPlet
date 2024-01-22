@@ -20,6 +20,7 @@ public class TCPReceiver {
     InetAddress Sender_IP;
     int Sender_port;
     boolean term = false;
+    String output;
 
     TCPReceiver(FilteredSocket socket, InetAddress Sender_IP, int Sender_port) {
         this.socket = socket;
@@ -28,7 +29,7 @@ public class TCPReceiver {
     }
 
     /**
-     * @param args java TCPReceiver -s SERVER_IP -p SERVER_PORT
+     * @param args java TCPReceiver -s SERVER_IP -p SERVER_PORT -f FILE_NAME
      */
     public static void main(String[] args) {
 
@@ -43,6 +44,7 @@ public class TCPReceiver {
 
         TCPReceiver receiver = new TCPReceiver(socket, Sender_IP, Sender_port);
         receiver.ackNum = Handshake.connect(socket, Sender_IP, Sender_port);
+        receiver.output = args[5];
 
         receiver.rdt();
     }
@@ -50,7 +52,7 @@ public class TCPReceiver {
     class Output implements Runnable {
         @Override
         public void run() {
-            String filePath = "output.txt"; // 目标文件路径
+            String filePath = output; // 目标文件路径
             FileOutputStream fos = null;
             try {
                 fos = new FileOutputStream(filePath);
