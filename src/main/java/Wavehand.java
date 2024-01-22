@@ -26,8 +26,8 @@ public class Wavehand {
         //Listen for next answer
         Segment receiveSeg = Segment.toSegment(receivePacket.getData());
         Segment receiveSeg1 = Segment.toSegment(receivePacket1.getData());
-        assert receiveSeg != null;
-        assert receiveSeg1 != null;
+        if (receiveSeg == null || receiveSeg1 == null)
+            System.exit(0);
         if (receiveSeg1.ack && receiveSeg1.fin && receiveSeg1.ackNum == seqNum + 1) {
             //final wave packet
             Segment ackPacket = new Segment();
@@ -50,6 +50,8 @@ public class Wavehand {
         }
         DatagramPacket receivePacket = socket.receive();
         Segment receiveSeg = Segment.toSegment(receivePacket.getData());
+        if (receiveSeg == null)
+            System.exit(0);
         //Send first answer
         if (receiveSeg.ack && receiveSeg.fin) {
             Segment finPacket = new Segment();

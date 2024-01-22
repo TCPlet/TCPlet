@@ -1,7 +1,5 @@
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,7 +31,7 @@ public class TCPSender {
                     timer.cancel();
                     timer = new Timer();
                     timer.schedule(new TimeoutTask(), delay);
-                    if (delay < 100) {
+                    if (delay < 1000) {
                         delay *= 2;
                     }
                 } else {
@@ -192,7 +190,7 @@ public class TCPSender {
                 assert (inFlight.containsKey(ack) && inFlight.containsKey(sack));
                 Map.Entry<Integer, InFlightSegment> entry = inFlight.firstEntry();
                 long curTimeStamp = System.currentTimeMillis();
-                while (entry.getKey() <= ack && !inFlight.isEmpty()) {
+                while (!inFlight.isEmpty() && entry.getKey() <= ack) {
                     inFlight.pollFirstEntry();
                     System.out.printf("Remove ack: %d\n", entry.getValue().ackNum);
                     if (!entry.getValue().retransmitted) {

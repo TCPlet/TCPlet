@@ -10,7 +10,7 @@ public class TCPReceiver {
 
     public ReentrantLock lock = new ReentrantLock();
     public Condition full = lock.newCondition();
-    public Condition empty = lock.newCondition();
+    public Condition starving = lock.newCondition();
     public FilteredSocket socket;
     public int RCV_WINDOW = 64 * 1024;
     // <seqNum, Segment>
@@ -59,34 +59,36 @@ public class TCPReceiver {
             }
             while (!term) {
                 lock.lock();
-                while (!term) {
-                    if (window.isEmpty()) {
-                        try {
-                            empty.await();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                if (window.isEmpty()) {
+                    try {
+                        starving.await();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
-                    Map.Entry<Integer, Segment> e = window.pollFirstEntry();
-                    System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
-                    if (e.getValue().seqNum == ackNum) {
-                        ackNum += e.getValue().data.length;
-                        RCV_WINDOW += e.getValue().data.length;
-                        try {
-                            // 将字节数组写入文件
-                            // TODO: Debug
-                            fos.write(e.getValue().data);
-                            System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
-                        } catch (IOException err) {
-                            throw new RuntimeException();
-                        }
-                        System.out.printf("Removed: seq %d\n", e.getValue().seqNum);
-                    } else {
-                        window.put(e.getKey(), e.getValue());
-                        break;
-                    }
-                    full.signal();
                 }
+                Map.Entry<Integer, Segment> e = window.pollFirstEntry();
+                System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
+                if (e.getValue().seqNum == ackNum) {
+                    ackNum += e.getValue().data.length;
+                    RCV_WINDOW += e.getValue().data.length;
+                    try {
+                        // 将字节数组写入文件
+                        // TODO: Debug
+                        fos.write(e.getValue().data);
+                        System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
+                    } catch (IOException err) {
+                        throw new RuntimeException();
+                    }
+                    System.out.printf("Removed: seq %d\n", e.getValue().seqNum);
+                } else {
+                    window.put(e.getKey(), e.getValue());
+                    try {
+                        starving.await();
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+                full.signal();
                 lock.unlock();
             }
             for (Map.Entry<Integer, Segment> en : window.entrySet()) {
@@ -98,7 +100,6 @@ public class TCPReceiver {
                 } catch (IOException err) {
                     throw new RuntimeException();
                 }
-
             }
             try {
                 fos.close();
@@ -108,44 +109,58 @@ public class TCPReceiver {
         }
     }
 
+    class Receiver implements Runnable {
+        @Override
+        public void run() {
+            while (true) {
+                Segment received = FilteredSocket.datagramPacket2Segment(socket.receive());
+                while (received == null) {
+                    System.out.println("Corrupted packet received");
+                    received = FilteredSocket.datagramPacket2Segment(socket.receive());
+                }
+                // TODO: DEBUG
+                //挥手
+                if (received.fin) {
+                    term = true;
+                    Wavehand.receiverClose(socket, ackNum, Sender_IP, Sender_port);
+                    break;
+                }
+                Segment ack = new Segment();
+                lock.lock();
+                if (received.data.length != 0 && RCV_WINDOW >= received.data.length && received.seqNum + received.data.length > ackNum && !window.containsKey(received.seqNum)) {
+                    // 1. not zero probing segment
+                    // 2. enough buffer space
+                    // 3. not acked before
+                    window.put(received.seqNum, received);
+                    ack.sackNum = received.seqNum + received.data.length;
+                    RCV_WINDOW -= received.data.length;
+                    starving.signal();
+                }
+                lock.unlock();
+                // TODO: DEBUG
+
+                ack.ackNum = ackNum;
+                ack.data = new byte[0];
+                ack.rcvWnd = RCV_WINDOW;
+
+                System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
+                System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
+
+                send(ack);
+            }
+        }
+    }
+
     private void rdt() {
         Thread output = new Thread(new Output());
+        Thread receiver = new Thread(new Receiver());
         output.start();
-        while (true) {
-            Segment received = FilteredSocket.datagramPacket2Segment(socket.receive());
-            while (received == null) {
-                System.out.println("Corrupted packet received");
-                received = FilteredSocket.datagramPacket2Segment(socket.receive());
-            }
-            // TODO: DEBUG
-            //挥手
-            if (received.fin) {
-                term = true;
-                Wavehand.receiverClose(socket, ackNum, Sender_IP, Sender_port);
-                break;
-            }
-            Segment ack = new Segment();
-            lock.lock();
-            if (received.data.length != 0 && RCV_WINDOW >= received.data.length && received.seqNum + received.data.length > ackNum) {
-                // 1. not zero probing segment
-                // 2. enough buffer space
-                // 3. not acked before
-                window.put(received.seqNum, received);
-                ack.ackNum = ackNum;
-                ack.sackNum = received.seqNum + received.data.length;
-                RCV_WINDOW -= received.data.length;
-                empty.signal();
-            }
-            lock.unlock();
-            // TODO: DEBUG
-
-            ack.data = new byte[0];
-            ack.rcvWnd = RCV_WINDOW;
-
-            System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
-            System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
-
-            send(ack);
+        receiver.start();
+        try {
+            output.join();
+            receiver.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
