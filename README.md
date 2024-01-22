@@ -13,8 +13,8 @@ Our group implemented Connection Management, Reliable Data Transfer and Flow Con
 |---------------------------------|-------------|
 | Sequence Number                 | 32          |
 | Acknowledgment Number           | 32          |
-| Receive Window                  | 32          |
 | Selective Acknowledgment Number | 32          | 
+| Receive Window                  | 32          |
 | Padding                         | 13          | 
 | Control Flags                   | 3           | 
 | Checksum                        | 16          | 

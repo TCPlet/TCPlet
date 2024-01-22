@@ -1,3 +1,5 @@
+import org.w3c.dom.CDATASection;
+
 import java.nio.ByteBuffer;
 
 public class Segment {
@@ -40,6 +42,10 @@ public class Segment {
     }
 
     public static Segment toSegment(byte[] packet) {
+        if (!Checksum.verifyChecksum(packet)) {
+            // Handle checksum validation failure
+            return null;
+        }
         Segment segment = new Segment();
 
         ByteBuffer buffer = ByteBuffer.wrap(packet);
@@ -56,16 +62,14 @@ public class Segment {
         segment.fin = (flagsAndPadding & 1) == 1;
 
         // Extract the checksum
-        byte[] checksum = new byte[16];
+        byte[] checksum = new byte[2];
         buffer.get(checksum);
-
-        if (!Checksum.verifyChecksum(packet)) {
-            // Handle checksum validation failure
-            return null;
-        }
 
         // Extract the data
         segment.data = buffer.array();
+        byte[] tmp = new byte[segment.data.length - 20];
+        System.arraycopy(segment.data, 20, tmp, 0, segment.data.length - 20);
+        segment.data = tmp;
 
         return segment;
     }

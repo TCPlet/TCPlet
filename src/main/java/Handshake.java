@@ -13,7 +13,7 @@ public class Handshake {
         if (synSegment != null && synSegment.syn) {
             // Generate a random sequence number for the initial ACK packet
             Random random = new Random();
-            int initialSeqNum = random.nextInt();
+            int initialSeqNum = Math.abs(random.nextInt()) % 10000;
 
             // Create a SYN-ACK packet
             Segment synAckPacket = new Segment();
@@ -21,6 +21,7 @@ public class Handshake {
             synAckPacket.ack = true;
             synAckPacket.seqNum = initialSeqNum;
             synAckPacket.ackNum = synSegment.seqNum + 1;
+            synAckPacket.data = new byte[0];
 
 
             // Send the SYN-ACK packet to the sender
@@ -34,25 +35,25 @@ public class Handshake {
             if (ackSegment != null && ackSegment.ack && ackSegment.ackNum == initialSeqNum + 1) {
                 // Handshake successful
 
-                return new ReceiverInfo(ackPacket.getAddress(), ackPacket.getPort(), ackSegment.seqNum, ackSegment.rcvWnd);
+                return new ReceiverInfo(ackPacket.getAddress(), ackPacket.getPort(), ackSegment.ackNum, ackSegment.rcvWnd);
             }
         }
-
 
         throw new RuntimeException("Handshake failed");
 
     }
 
     // handshake for receiver
-    public static void connect(FilteredSocket receiverSocket, InetAddress SENDER_IP_ADDR, int SENDER_PORT) {
+    public static int connect(FilteredSocket receiverSocket, InetAddress SENDER_IP_ADDR, int SENDER_PORT) {
 
         Random random = new Random();
-        int initialSeqNum = random.nextInt();
+        int initialSeqNum = Math.abs(random.nextInt()) % 10000;
 
         // Create a SYN packet
         Segment synPacket = new Segment();
         synPacket.syn = true;
         synPacket.seqNum = initialSeqNum;
+        synPacket.data = new byte[0];
 
         // Send the SYN packet to the sender
         receiverSocket.rawChannelSend(synPacket.toByteStream(), SENDER_IP_ADDR, SENDER_PORT);
@@ -62,18 +63,18 @@ public class Handshake {
         Segment synAckSegment = Segment.toSegment(synAckPacket.getData());
 
         // Validate the SYN-ACK packet
+        Segment ackPacket = new Segment();
         if (synAckSegment != null && synAckSegment.syn && synAckSegment.ack && synAckSegment.ackNum == initialSeqNum + 1) {
             // Create an ACK packet
-            Segment ackPacket = new Segment();
             ackPacket.ack = true;
             ackPacket.ackNum = synAckSegment.seqNum + 1;
-            ackPacket.rcvWnd = TCPSender.SND_WND;
+            ackPacket.rcvWnd = 64 * 1024;
+            ackPacket.data = new byte[0];
             receiverSocket.rawChannelSend(ackPacket.toByteStream(), SENDER_IP_ADDR, SENDER_PORT);
         } else {
-
             throw new RuntimeException("Handshake failed");
         }
-
+        return ackPacket.ackNum;
     }
 
 }

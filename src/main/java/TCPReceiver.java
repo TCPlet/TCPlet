@@ -1,23 +1,24 @@
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class TCPReceiver {
 
-    private final Lock lock = new ReentrantLock();
+    public ReentrantLock lock = new ReentrantLock();
     public FilteredSocket socket;
-    public static int RCV_WINDOW = 2048;
-
-    public boolean is_finish = false;
-    private final ArrayList<Segment> wait_to_send = new ArrayList<>();
-
-    //初始设为负，表示从未接受过数据
-    private static int PRE_ack = -1;
-    public static int MSS = 1460;
+    public int RCV_WINDOW = 64 * 1024;
+    // <seqNum, Segment>
+    private TreeMap<Integer, Segment> window = new TreeMap<>();
+    private int ackNum = -1;
+    public int MSS = 1460;
     InetAddress Sender_IP;
     int Sender_port;
+    boolean term = false;
 
     TCPReceiver(FilteredSocket socket, InetAddress Sender_IP, int Sender_port) {
         this.socket = socket;
@@ -37,80 +38,91 @@ public class TCPReceiver {
             throw new RuntimeException(e);
         }
         int Sender_port = Integer.parseInt(args[3]);
-        FilteredSocket socket = new FilteredSocket(Sender_port);
-
+        FilteredSocket socket = new FilteredSocket(11451);
 
         TCPReceiver receiver = new TCPReceiver(socket, Sender_IP, Sender_port);
-        Handshake.connect(socket, Sender_IP, Sender_port);
+        receiver.ackNum = Handshake.connect(socket, Sender_IP, Sender_port);
 
         receiver.rdt();
-
-
     }
 
-    class Receive_from_Sender implements Runnable {
-
+    class Output implements Runnable {
         @Override
         public void run() {
-            while (true) {
-                Segment segment = FilteredSocket.datagramPacket2Segment(socket.receive());
-                //挥手
-                if (segment.fin) {
-                    Wavehand.receiverClose(socket, PRE_ack, Sender_IP, Sender_port);
-                    is_finish = true;
-                    break;
-                }
-
-                if (PRE_ack < 0 || PRE_ack == segment.seqNum) {
-                    PRE_ack = segment.seqNum + segment.data.length + 1;
-                    segment.ackNum = PRE_ack;
-                    segment.sackNum = segment.ackNum;
-                } else {
-                    segment.ackNum = PRE_ack;
-                    segment.sackNum = segment.ackNum;
-                }
-
+            String filePath = "output.txt"; // 目标文件路径
+            FileOutputStream fos = null;
+            try {
+                fos = new FileOutputStream(filePath);
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            while (!term) {
                 lock.lock();
-                RCV_WINDOW -= MSS;
-                wait_to_send.add(segment);
+                while (!window.isEmpty()) {
+                    Map.Entry<Integer, Segment> e = window.pollFirstEntry();
+                    if (e.getValue().seqNum == ackNum) {
+                        ackNum += e.getValue().ackNum + e.getValue().data.length;
+                        RCV_WINDOW += e.getValue().data.length;
+//                        System.out.println(Arrays.toString(e1.getValue().data));
+                        try {
+                            // 将字节数组写入文件
+                            // TODO: Debug
+                            System.out.println(new String(e.getValue().data));
+                            fos.write(e.getValue().data);
+                            System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
+                        } catch (IOException err) {
+                            throw new RuntimeException();
+                        }
+                        System.out.printf("Removed: seq %d\n", e.getValue().seqNum);
+                    } else {
+                        window.put(e.getKey(), e.getValue());
+                        break;
+                    }
+                }
                 lock.unlock();
             }
-        }
-
-
-    }
-
-    class Send_to_Sender implements Runnable {
-        @Override
-        public void run() {
-
-
-            while (true) {
-                if (is_finish && wait_to_send.size() == 0) {
-                    break;
-                }
-                lock.lock();
-                if (wait_to_send.size() > 0) {
-
-                    Segment newseg = wait_to_send.get(0);
-                    RCV_WINDOW += MSS;
-                    wait_to_send.remove(0);
-                    newseg.rcvWnd = RCV_WINDOW;
-                    socket.rawChannelSend(newseg.toByteStream(), Sender_IP, Sender_port);
-
-                }
-                lock.unlock();
-
+            try {
+                fos.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
 
     private void rdt() {
-        Thread Receive_from_Sender = new Thread(new TCPReceiver.Receive_from_Sender());
-        Thread Send_to_Sender = new Thread(new TCPReceiver.Send_to_Sender());
-        Receive_from_Sender.start();
-        Send_to_Sender.start();
+        Thread output = new Thread(new Output());
+        output.start();
+        while (true) {
+            Segment received = FilteredSocket.datagramPacket2Segment(socket.receive());
+            while (received == null) {
+                received = FilteredSocket.datagramPacket2Segment(socket.receive());
+            }
+            // TODO: DEBUG
+            //挥手
+            if (received.fin) {
+                term = true;
+                Wavehand.receiverClose(socket, ackNum, Sender_IP, Sender_port);
+                break;
+            }
+            Segment ack = new Segment();
+            lock.lock();
+            if (received.data.length != 0 && RCV_WINDOW >= received.data.length) {
+                window.put(received.seqNum, received);
+                RCV_WINDOW -= received.data.length;
+                ack.ackNum = ackNum;
+                ack.sackNum = received.seqNum + received.data.length;
+            }
+            lock.unlock();
+            // TODO: DEBUG
 
+            ack.data = new byte[0];
+            ack.rcvWnd = RCV_WINDOW;
+
+            System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
+            System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
+
+            socket.rawChannelSend(ack.toByteStream(), Sender_IP, Sender_port);
+        }
     }
 }
 

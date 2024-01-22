@@ -1,14 +1,11 @@
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.util.*;
 
 public class FilteredSocket {
 
-    private final DatagramSocket socket;
+    final DatagramSocket socket;
     Double outOrderChance = 0.01;
     Double contentChane = 0.01;
     Double lossChance = 0.01;
@@ -35,7 +32,10 @@ public class FilteredSocket {
 
     public static Segment datagramPacket2Segment(DatagramPacket datagramPacket) {
         byte[] data = datagramPacket.getData();
-        return Segment.toSegment(data);
+        int actLen = datagramPacket.getLength();
+        byte[] rv = new byte[actLen];
+        System.arraycopy(data, 0, rv, 0, actLen);
+        return Segment.toSegment(rv);
     }
 
     public DatagramPacket receive() {
@@ -43,6 +43,8 @@ public class FilteredSocket {
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         try {
             socket.receive(receivePacket);
+        } catch (SocketTimeoutException e) {
+            System.exit(0);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
