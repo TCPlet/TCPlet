@@ -7,9 +7,10 @@ import java.util.concurrent.PriorityBlockingQueue;
 public class FilteredSocket {
 
     final DatagramSocket socket;
-    Double outOrderChance = 0.0001;
-    Double contentChane = 0.001;
-    Double lossChance = 0.001;
+    Random random = new Random();
+    int outOrderChance = 1;
+    int contentChane = 10;
+    int lossChance = 10;
     private final PriorityBlockingQueue<BufferNode> buffer = new PriorityBlockingQueue<>();
 
     public FilteredSocket(int port) {
@@ -98,7 +99,6 @@ public class FilteredSocket {
     private byte[] changeContent(byte[] data) {
         int len = data.length * 0.01 > 1 ? (int) (data.length * 0.01) : 1;
         Queue<Integer> Numqueue = new LinkedList<>();
-        Random random = new Random();
         for (int i = 0; i < len; i++) Numqueue.add(random.nextInt(data.length));
         while (!Numqueue.isEmpty()) {
             int temp = random.nextInt(8);
@@ -109,15 +109,13 @@ public class FilteredSocket {
         return data;
     }
 
-    private boolean smallChance(double small) {
-        Random random = new Random();
-        double chance = random.nextDouble(1);
-        return (chance < small);
+    private boolean smallChance(int small) {
+        int chance = random.nextInt(1000);
+        return (chance <= small);
     }
 
     private boolean halfChance() {
-        Random random = new Random();
-        return random.nextBoolean();
+        return random.nextInt() < 0.5;
     }
 
     class BufferNode implements Comparable<BufferNode> {
