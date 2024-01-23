@@ -68,22 +68,24 @@ public class TCPReceiver {
                         throw new RuntimeException(e);
                     }
                 }
-                Map.Entry<Integer, Segment> e = window.pollFirstEntry();
+                Map.Entry<Integer, Segment> e = window.firstEntry();
                 System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
-                if (e.getValue().seqNum == ackNum) {
+                boolean moved = false;
+                while (e != null && e.getValue().seqNum == ackNum) {
+                    moved = true;
+                    window.pollFirstEntry();
                     ackNum += e.getValue().data.length;
                     RCV_WINDOW += e.getValue().data.length;
                     try {
                         // 将字节数组写入文件
-                        // TODO: Debug
                         fos.write(e.getValue().data);
                         System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
                     } catch (IOException err) {
                         throw new RuntimeException();
                     }
-                    System.out.printf("Removed: seq %d\n", e.getValue().seqNum);
-                } else {
-                    window.put(e.getKey(), e.getValue());
+                    e = window.firstEntry();
+                }
+                if (!moved) {
                     try {
                         starving.await();
                     } catch (InterruptedException ex) {
@@ -98,7 +100,7 @@ public class TCPReceiver {
                     // 将字节数组写入文件
                     // TODO: Debug
                     fos.write(en.getValue().data);
-                    System.out.printf("Bytes %d ~ %d written to file successfully.\n", en.getValue().seqNum, en.getValue().seqNum + en.getValue().data.length);
+//                    System.out.printf("Bytes %d ~ %d written to file successfully.\n", en.getValue().seqNum, en.getValue().seqNum + en.getValue().data.length);
                 } catch (IOException err) {
                     throw new RuntimeException();
                 }

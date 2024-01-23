@@ -26,7 +26,7 @@ public class TCPSender {
                     for (int i : inFlight.keySet()) {
                         sb.append(i + " ");
                     }
-                    System.out.println("In flight: " + sb.toString());
+                    System.out.println("In flight ackNum: " + sb);
                     send(segment);
                     timer.cancel();
                     timer = new Timer();
@@ -56,8 +56,8 @@ public class TCPSender {
     public FilteredSocket socket;
     public ReceiverInfo receiver;
     private AtomicInteger RCV_WND;
-    // <ackNum, Segment>
     private final TreeMap<Integer, Segment> segmentStream = new TreeMap<>();
+    // <ackNum, Segment>
     private final TreeMap<Integer, InFlightSegment> inFlight = new TreeMap<>();
 
     private long EstimatedRTT = 1000;
@@ -99,7 +99,7 @@ public class TCPSender {
         for (int start = 0; start < len; start += MSS) {
             int end = Math.min(start + MSS, len);
             byte[] arr = new byte[end - start];
-            System.out.printf("seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
+            System.out.printf("Segments: seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
             System.arraycopy(data, start, arr, 0, end - start);
             Segment segment = new Segment();
             segment.seqNum = prevSeq;
