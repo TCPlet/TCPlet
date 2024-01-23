@@ -23,11 +23,11 @@ public class TCPSender {
                     retransmitted = true;
                     if (debug) {
                         System.out.printf("Timeout send: ack %d, len %d\n", ackNum, segment.data.length);
-                        StringBuilder sb = new StringBuilder();
-                        for (int i : inFlight.keySet()) {
-                            sb.append(i + " ");
-                        }
-                        System.out.println("In flight ackNum: " + sb);
+//                        StringBuilder sb = new StringBuilder();
+//                        for (int i : inFlight.keySet()) {
+//                            sb.append(i + " ");
+//                        }
+//                        System.out.println("In flight ackNum: " + sb);
                     }
                     send(segment);
                     timer.schedule(new TimeoutTask(), delay);
