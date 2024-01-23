@@ -22,6 +22,8 @@ public class TCPReceiver {
     boolean term = false;
     String output;
 
+    private static boolean debug = false;
+
     TCPReceiver(FilteredSocket socket, InetAddress Sender_IP, int Sender_port) {
         this.socket = socket;
         this.Sender_port = Sender_port;
@@ -29,7 +31,7 @@ public class TCPReceiver {
     }
 
     /**
-     * @param args java TCPReceiver -s SERVER_IP -p SERVER_PORT -f FILE_NAME
+     * @param args java TCPReceiver -s SERVER_IP -p SERVER_PORT -f FILE_NAME -d
      */
     public static void main(String[] args) {
 
@@ -45,6 +47,9 @@ public class TCPReceiver {
         TCPReceiver receiver = new TCPReceiver(socket, Sender_IP, Sender_port);
         receiver.ackNum = Handshake.connect(socket, Sender_IP, Sender_port);
         receiver.output = args[5];
+        if (args.length > 6) {
+            debug = true;
+        }
 
         receiver.rdt();
     }
@@ -69,7 +74,9 @@ public class TCPReceiver {
                     }
                 }
                 Map.Entry<Integer, Segment> e = window.firstEntry();
-                System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
+                if (debug) {
+                    System.out.printf("Window size: %d, smallest seq: %d, ackNum: %d\n", window.size(), e.getValue().seqNum, ackNum);
+                }
                 boolean moved = false;
                 while (e != null && e.getValue().seqNum == ackNum) {
                     moved = true;
@@ -79,7 +86,9 @@ public class TCPReceiver {
                     try {
                         // 将字节数组写入文件
                         fos.write(e.getValue().data);
-                        System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
+                        if (debug) {
+                            System.out.printf("Bytes %d ~ %d written to file successfully.\n", e.getValue().seqNum, e.getValue().seqNum + e.getValue().data.length);
+                        }
                     } catch (IOException err) {
                         throw new RuntimeException();
                     }
@@ -98,9 +107,10 @@ public class TCPReceiver {
             for (Map.Entry<Integer, Segment> en : window.entrySet()) {
                 try {
                     // 将字节数组写入文件
-                    // TODO: Debug
                     fos.write(en.getValue().data);
-//                    System.out.printf("Bytes %d ~ %d written to file successfully.\n", en.getValue().seqNum, en.getValue().seqNum + en.getValue().data.length);
+                    if (debug) {
+                        System.out.printf("Bytes %d ~ %d written to file successfully.\n", en.getValue().seqNum, en.getValue().seqNum + en.getValue().data.length);
+                    }
                 } catch (IOException err) {
                     throw new RuntimeException();
                 }
@@ -119,7 +129,9 @@ public class TCPReceiver {
             while (true) {
                 Segment received = FilteredSocket.datagramPacket2Segment(socket.receive());
                 while (received == null) {
-                    System.out.println("Corrupted packet received");
+                    if (debug) {
+                        System.out.println("Corrupted packet received");
+                    }
                     received = FilteredSocket.datagramPacket2Segment(socket.receive());
                 }
                 // TODO: DEBUG
@@ -147,8 +159,10 @@ public class TCPReceiver {
                 ack.data = new byte[0];
                 ack.rcvWnd = RCV_WINDOW;
 
-                System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
-                System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
+                if (debug) {
+                    System.out.printf("DATA received: seq %d, len %d\n", received.seqNum, received.data.length);
+                    System.out.printf("ACK sent: ack %d, sack %d, wnd %d\n", ack.ackNum, ack.sackNum, ack.rcvWnd);
+                }
 
                 send(ack);
             }

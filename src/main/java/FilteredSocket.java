@@ -2,25 +2,15 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.PriorityBlockingQueue;
 
 public class FilteredSocket {
 
     final DatagramSocket socket;
-    Double outOrderChance = 0.001;
+    Double outOrderChance = 0.0001;
     Double contentChane = 0.001;
     Double lossChance = 0.001;
-    //PriorityQueue Compare
-    Comparator<BufferNode> customComparator = new Comparator<BufferNode>() {
-        @Override
-        public int compare(BufferNode o1, BufferNode o2) {
-            // 根据元素的值进行比较，值越小优先级越高
-            //根据checksum比较
-            int num_o1 = o1.data[18] + o1.data[19];
-            int num_o2 = o2.data[18] + o2.data[19];
-            return Integer.compare(num_o1, num_o2);
-        }
-    };
-    private PriorityQueue<BufferNode> buffer = new PriorityQueue<>(customComparator);
+    private final PriorityBlockingQueue<BufferNode> buffer = new PriorityBlockingQueue<>();
 
     public FilteredSocket(int port) {
         try {
@@ -59,14 +49,17 @@ public class FilteredSocket {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        checkBuffer();
+        if (!buffer.isEmpty()) {
+            checkBuffer();
+        }
     }
 
     public void checkBuffer() {
-        if (!buffer.isEmpty()) {
-            BufferNode temp = buffer.poll();
-            rawChannelSend(temp.data, temp.dest, temp.port);
+        BufferNode temp = buffer.poll();
+        if (temp == null) {
+            return;
         }
+        rawChannelSend(temp.data, temp.dest, temp.port);
     }
 
     // data loss
@@ -83,10 +76,10 @@ public class FilteredSocket {
             //corrupt content
             changeContent(data);
         }
-        if (smallChance(outOrderChance)) {
+        if (smallChance(outOrderChance) && buffer.size() < 2) {
             //change order
             BufferNode Node = new BufferNode(data, dest, destPort);
-            buffer.add(Node);
+            buffer.offer(Node);
             return;
         }
         rawChannelSend(data, dest, destPort);
@@ -118,7 +111,7 @@ public class FilteredSocket {
 
     private boolean smallChance(double small) {
         Random random = new Random();
-        Double chance = random.nextDouble(1);
+        double chance = random.nextDouble(1);
         return (chance < small);
     }
 
@@ -127,7 +120,7 @@ public class FilteredSocket {
         return random.nextBoolean();
     }
 
-    class BufferNode {
+    class BufferNode implements Comparable<BufferNode> {
         byte[] data;
         InetAddress dest;
         int port;
@@ -136,6 +129,11 @@ public class FilteredSocket {
             this.data = data;
             this.dest = dest;
             this.port = port;
+        }
+
+        @Override
+        public int compareTo(BufferNode o) {
+            return this.hashCode() - o.hashCode();
         }
     }
 }

@@ -21,21 +21,22 @@ public class TCPSender {
             public void run() {
                 if (inFlight.containsKey(ackNum)) {
                     retransmitted = true;
-                    System.out.printf("Timeout send: ack %d, len %d\n", ackNum, segment.data.length);
-                    StringBuilder sb = new StringBuilder();
-                    for (int i : inFlight.keySet()) {
-                        sb.append(i + " ");
+                    if (debug) {
+                        System.out.printf("Timeout send: ack %d, len %d\n", ackNum, segment.data.length);
+                        StringBuilder sb = new StringBuilder();
+                        for (int i : inFlight.keySet()) {
+                            sb.append(i + " ");
+                        }
+                        System.out.println("In flight ackNum: " + sb);
                     }
-                    System.out.println("In flight ackNum: " + sb);
                     send(segment);
-                    timer.cancel();
-                    timer = new Timer();
                     timer.schedule(new TimeoutTask(), delay);
                     if (delay < 1000) {
                         delay *= 2;
                     }
                 } else {
                     timer.cancel();
+                    Thread.currentThread().interrupt();
                 }
 
             }
@@ -67,12 +68,17 @@ public class TCPSender {
     private final Lock inFlightLock = new ReentrantLock();
     private final Condition inFlightCondition = inFlightLock.newCondition();
 
+    private static boolean debug = false;
+
     /**
-     * @param args java TCPSender -p SENDER_PORT -f FILE_NAME
+     * @param args java TCPSender -p SENDER_PORT -f FILE_NAME -d
      */
     public static void main(String[] args) {
         int senderPort = Integer.parseInt(args[1]);
         File file = new File(args[3]);
+        if (args.length > 4) {
+            debug = true;
+        }
         byte[] data = new byte[0];
         try {
             data = Files.readAllBytes(file.toPath());
@@ -99,7 +105,9 @@ public class TCPSender {
         for (int start = 0; start < len; start += MSS) {
             int end = Math.min(start + MSS, len);
             byte[] arr = new byte[end - start];
-            System.out.printf("Segments: seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
+            if (debug) {
+                System.out.printf("Segments: seq: %d, ack: %d\n", prevSeq, prevSeq + end - start);
+            }
             System.arraycopy(data, start, arr, 0, end - start);
             Segment segment = new Segment();
             segment.seqNum = prevSeq;
@@ -132,7 +140,7 @@ public class TCPSender {
                     if (inFlight.size() * MSS >= SND_WND) {
                         inFlightCondition.await();
                     }
-                    while (inFlight.size() * MSS >= RCV_WND.get() && !inFlight.isEmpty()) {
+                    if (inFlight.size() * MSS >= RCV_WND.get()) {
                         inFlightCondition.await();
                     }
                     Map.Entry<Integer, Segment> entry = segmentStream.pollFirstEntry();
@@ -141,14 +149,17 @@ public class TCPSender {
                         zeroProbingSegment.data = new byte[0];
                         zeroProbingSegment.seqNum = prevACK;
                         send(zeroProbingSegment);
-                        System.out.println("Zero window probing");
+                        if (debug) {
+                            System.out.println("Zero window probing");
+                        }
                         Thread.sleep(EstimatedRTT + 4 * DevRTT);
                     }
                     InFlightSegment inFlightSegment = new InFlightSegment(entry.getValue());
                     inFlight.put(entry.getKey() + inFlightSegment.segment.data.length, inFlightSegment);
                     send(entry.getValue());
-                    //TODO: DEBUG
-                    System.out.printf("DATA sent: seq %d, len %d, ack %d\n", entry.getValue().seqNum, entry.getValue().data.length, entry.getValue().seqNum + entry.getValue().data.length);
+                    if (debug) {
+                        System.out.printf("DATA sent: seq %d, len %d, ack %d\n", entry.getValue().seqNum, entry.getValue().data.length, entry.getValue().seqNum + entry.getValue().data.length);
+                    }
                     inFlightLock.unlock();
                 }
             } catch (InterruptedException e) {
@@ -167,7 +178,9 @@ public class TCPSender {
                     segment = FilteredSocket.datagramPacket2Segment(socket.receive());
                 }
                 int ack = segment.ackNum;
-                System.out.printf("ACK received: ack %d sack %d wnd %d\n", ack, segment.sackNum, segment.rcvWnd);
+                if (debug) {
+                    System.out.printf("ACK received: ack %d sack %d wnd %d\n", ack, segment.sackNum, segment.rcvWnd);
+                }
                 //TODO: DEBUG
                 inFlightLock.lock();
                 if (prevACK == ack) {
@@ -175,7 +188,9 @@ public class TCPSender {
                         for (Map.Entry<Integer, InFlightSegment> e : inFlight.entrySet()) {
                             InFlightSegment inFlightSegment = e.getValue();
                             inFlightSegment.retransmitted = true;
-                            System.out.printf("FAST retransmit: seq %d, len %d\n", inFlightSegment.segment.seqNum, inFlightSegment.segment.data.length);
+                            if (debug) {
+                                System.out.printf("FAST retransmit: seq %d, len %d\n", inFlightSegment.segment.seqNum, inFlightSegment.segment.data.length);
+                            }
                             send(inFlightSegment.segment);
                             duplicateACKCount = 0;
                         }
@@ -192,7 +207,9 @@ public class TCPSender {
                 long curTimeStamp = System.currentTimeMillis();
                 while (!inFlight.isEmpty() && entry.getKey() <= ack) {
                     inFlight.pollFirstEntry();
-                    System.out.printf("Remove ack: %d\n", entry.getValue().ackNum);
+                    if (debug) {
+                        System.out.printf("Remove ack: %d\n", entry.getValue().ackNum);
+                    }
                     if (!entry.getValue().retransmitted) {
                         updateRTT(curTimeStamp - entry.getValue().timestamp);
                     }
